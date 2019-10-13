@@ -10,17 +10,18 @@ export { MarkdownEditorResizeSensorComponent } from './lib/resize-sensor/resize-
 export { MdEditorOption, UploadResult, MarkedjsOption } from './lib/md-editor.types';
 
 @NgModule({
-  declarations: [
-    MarkdownEditorComponent,
-    MarkdownEditorResizeSensorComponent
-  ],
-  imports: [
-    CommonModule,
-    FormsModule
-  ],
-  exports: [
-    MarkdownEditorComponent,
-    MarkdownEditorResizeSensorComponent
-  ]
+	declarations: [
+		MarkdownEditorComponent,
+		MarkdownEditorResizeSensorComponent
+	],
+	imports: [
+		CommonModule,
+		FormsModule
+	],
+	exports: [
+		MarkdownEditorComponent,
+		MarkdownEditorResizeSensorComponent
+	]
 })
-export class LMarkdownEditorModule { }
+export class LMarkdownEditorModule {
+}
