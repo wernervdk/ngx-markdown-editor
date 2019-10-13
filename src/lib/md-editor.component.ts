@@ -1,5 +1,12 @@
-import { Component, ViewChild, forwardRef, Renderer, Attribute, Input, ElementRef } from '@angular/core';
-import { NG_VALUE_ACCESSOR, ControlValueAccessor, NG_VALIDATORS, Validator, AbstractControl, ValidationErrors } from '@angular/forms';
+import { Attribute, Component, ElementRef, forwardRef, Input, Renderer2, ViewChild } from '@angular/core';
+import {
+	AbstractControl,
+	ControlValueAccessor,
+	NG_VALIDATORS,
+	NG_VALUE_ACCESSOR,
+	ValidationErrors,
+	Validator
+} from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MdEditorOption } from './md-editor.types';
 
@@ -8,342 +15,350 @@ declare let marked: any;
 declare let hljs: any;
 
 @Component({
-  selector: 'md-editor',
-  styleUrls: ['./md-editor.scss'],
-  templateUrl: './md-editor.html',
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => MarkdownEditorComponent),
-      multi: true
-    },
-    {
-      provide: NG_VALIDATORS,
-      useExisting: forwardRef(() => MarkdownEditorComponent),
-      multi: true
-    }
-  ]
+	selector: 'md-editor',
+	styleUrls: ['./md-editor.scss'],
+	templateUrl: './md-editor.html',
+	providers: [
+		{
+			provide: NG_VALUE_ACCESSOR,
+			useExisting: forwardRef(() => MarkdownEditorComponent),
+			multi: true
+		},
+		{
+			provide: NG_VALIDATORS,
+			useExisting: forwardRef(() => MarkdownEditorComponent),
+			multi: true
+		}
+	]
 })
 
 export class MarkdownEditorComponent implements ControlValueAccessor, Validator {
 
-  @ViewChild('aceEditor', { static: false }) public aceEditorContainer: ElementRef;
-  @Input() public hideToolbar: boolean = false;
-  @Input() public height: string = "300px";
-  @Input() public preRender: Function;
-  @Input() public upload: Function;
+	@ViewChild('aceEditor', {static: false}) public aceEditorContainer: ElementRef;
+	@Input() public hideToolbar: boolean = false;
+	@Input() public height: string = "300px";
+	@Input() public preRender: Function;
+	@Input() public upload: Function;
 
-  @Input()
-  public get mode(): string {
-    return this._mode || 'editor';
-  }
-  public set mode(value: string) {
-    if (!value || (value.toLowerCase() !== 'editor' && value.toLowerCase() !== 'preview')) {
-      value = 'editor';
-    }
-    this._mode = value;
-  }
-  private _mode: string;
+	@Input()
+	public get mode(): string {
+		return this._mode || 'editor';
+	}
 
-  @Input()
-  public get options(): MdEditorOption {
-    return this._options || {};
-  }
-  public set options(value: MdEditorOption) {
-    this._options = Object.assign(this._defaultOption, {}, value);
-    this.hideIcons = {};
-    if (this._options.showPreviewPanel === true || this._options.showPreviewPanel === false) {
-      this.showPreviewPanel = this._options.showPreviewPanel;
-    }
-    if (this._options.hideIcons) {
-      this._options.hideIcons.forEach((v: any) => this.hideIcons[v] = true);
-    }
-  }
-  private _options: any = {};
+	public set mode(value: string) {
+		if (!value || (value.toLowerCase() !== 'editor' && value.toLowerCase() !== 'preview')) {
+			value = 'editor';
+		}
+		this._mode = value;
+	}
 
-  public hideIcons: any = {};
-  public showPreviewPanel: boolean = true;
-  public isFullScreen: boolean = false;
-  public previewHtml: any;
-  public dragover: boolean = false;
-  public isUploading: boolean = false;
+	private _mode: string;
 
-  public get markdownValue(): any {
-    return this._markdownValue || '';
-  }
-  public set markdownValue(value: any) {
-    this._markdownValue = value;
-    this._onChange(value);
+	@Input()
+	public get options(): MdEditorOption {
+		return this._options || {};
+	}
 
-    if (this.preRender && this.preRender instanceof Function) {
-      value = this.preRender(value);
-    }
-    if (value !== null && value !== undefined) {
-      if (this._renderMarkTimeout) clearTimeout(this._renderMarkTimeout);
-      this._renderMarkTimeout = setTimeout(() => {
-        let html = marked(value || '', this._markedOpt);
-        this.previewHtml = this._domSanitizer.bypassSecurityTrustHtml(html);
-      }, 100);
-    }
-  }
-  private _markdownValue: any;
+	public set options(value: MdEditorOption) {
+		this._options = Object.assign(this._defaultOption, {}, value);
+		this.hideIcons = {};
+		if (this._options.showPreviewPanel === true || this._options.showPreviewPanel === false) {
+			this.showPreviewPanel = this._options.showPreviewPanel;
+		}
+		if (this._options.hideIcons) {
+			this._options.hideIcons.forEach((v: any) => this.hideIcons[v] = true);
+		}
+	}
 
-  private _editor: any;
-  private _editorResizeTimer: any;
-  private _renderMarkTimeout: any;
-  private _markedOpt: any;
-  private _defaultOption: MdEditorOption = {
-    showPreviewPanel: true,
-    showBorder: true,
-    hideIcons: [],
-    usingFontAwesome5: false,
-    scrollPastEnd: 0,
-    enablePreviewContentClick: false,
-    resizable: false
-  };
-  private get _hasUploadFunction(): boolean {
-    return this.upload && this.upload instanceof Function;
-  }
+	private _options: any = {};
 
-  private _onChange = (_: any) => { };
-  private _onTouched = () => { };
+	public hideIcons: any = {};
+	public showPreviewPanel: boolean = true;
+	public isFullScreen: boolean = false;
+	public previewHtml: any;
+	public dragover: boolean = false;
+	public isUploading: boolean = false;
 
-  constructor(
-    @Attribute('required') public required: boolean = false,
-    @Attribute('maxlength') public maxlength: number = -1,
-    private _renderer: Renderer,
-    private _domSanitizer: DomSanitizer) {
+	public get markdownValue(): any {
+		return this._markdownValue || '';
+	}
 
-  }
+	public set markdownValue(value: any) {
+		this._markdownValue = value;
+		this._onChange(value);
 
-  ngOnInit() {
-    let markedRender = new marked.Renderer();
-    markedRender.image = function (href: string, title: string, text: string) {
-      let out = `<img style="max-width: 100%;" src="${href}" alt="${text}"`;
-      if (title) {
-        out += ` title="${title}"`;
-      }
-      out += (<any>this.options).xhtml ? "/>" : ">";
-      console.log(out);
-      return out;
-    };
-    markedRender.code = function (code: any, language: any) {
-      let validLang = !!(language && hljs.getLanguage(language));
-      let highlighted = validLang ? hljs.highlight(language, code).value : code;
-      return `<pre style="padding: 0; border-radius: 0;"><code class="hljs ${language}">${highlighted}</code></pre>`;
-    };
-    markedRender.table = function (header: string, body: string) {
-      return `<table class="table table-bordered">\n<thead>\n${header}</thead>\n<tbody>\n${body}</tbody>\n</table>\n`;
-    };
-    markedRender.listitem = function (text: any, task: boolean, checked: boolean) {
-      if (/^\s*\[[x ]\]\s*/.test(text) || text.startsWith('<input')) {
-        if (text.startsWith('<input')) {
-          text = text
-            .replace('<input disabled="" type="checkbox">', '<i class="fa fa-square-o"></i>')
-            .replace('<input checked="" disabled="" type="checkbox">', '<i class="fa fa-check-square"></i>');
-        } else {
-          text = text
-            .replace(/^\s*\[ \]\s*/, '<i class="fa fa-square-o"></i> ')
-            .replace(/^\s*\[x\]\s*/, '<i class="fa fa-check-square"></i> ');
-        }
-        return `<li>${text}</li>`;
-      } else {
-        return `<li>${text}</li>`;
-      }
-    };
-    let markedjsOpt = {
-      renderer: markedRender,
-      highlight: (code: any) => hljs.highlightAuto(code).value
-    };
-    this._markedOpt = Object.assign({}, markedjsOpt, this.options.markedjsOpt);
-  }
+		if (this.preRender && this.preRender instanceof Function) {
+			value = this.preRender(value);
+		}
+		if (value !== null && value !== undefined) {
+			if (this._renderMarkTimeout) clearTimeout(this._renderMarkTimeout);
+			this._renderMarkTimeout = setTimeout(() => {
+				let html = marked(value || '', this._markedOpt);
+				this.previewHtml = this._domSanitizer.bypassSecurityTrustHtml(html);
+			}, 100);
+		}
+	}
 
-  ngAfterViewInit() {
-    let editorElement = this.aceEditorContainer.nativeElement;
-    this._editor = ace.edit(editorElement);
-    this._editor.$blockScrolling = Infinity;
-    this._editor.getSession().setUseWrapMode(true);
-    this._editor.getSession().setMode("ace/mode/markdown");
-    this._editor.setValue(this.markdownValue || '', 1);
-    this._editor.setOption('scrollPastEnd', this._options.scrollPastEnd || 0);
+	private _markdownValue: any;
 
-    this._editor.on("change", (e: any) => {
-      let val = this._editor.getValue();
-      this.markdownValue = val;
-    });
-  }
+	private _editor: any;
+	private _editorResizeTimer: any;
+	private _renderMarkTimeout: any;
+	private _markedOpt: any;
+	private _defaultOption: MdEditorOption = {
+		showPreviewPanel: true,
+		showBorder: true,
+		hideIcons: [],
+		usingFontAwesome5: false,
+		scrollPastEnd: 0,
+		enablePreviewContentClick: false,
+		resizable: false
+	};
 
-  ngOnDestroy() {
-    this._editor && this._editor.destroy();
-  }
+	private get _hasUploadFunction(): boolean {
+		return this.upload && this.upload instanceof Function;
+	}
 
-  writeValue(value: any | Array<any>): void {
-    setTimeout(() => {
-      this.markdownValue = value;
-      if (typeof value !== 'undefined' && this._editor) {
-        this._editor.setValue(value || '', 1);
-      }
-    }, 1);
-  }
+	private _onChange = (_: any) => {
+	};
+	private _onTouched = () => {
+	};
 
-  registerOnChange(fn: (_: any) => {}): void {
-    this._onChange = fn;
-  }
+	constructor(
+		@Attribute('required') public required: boolean = false,
+		@Attribute('maxlength') public maxlength: number = -1,
+		private _renderer: Renderer2,
+		private _domSanitizer: DomSanitizer) {
+	}
 
-  registerOnTouched(fn: () => {}): void {
-    this._onTouched = fn;
-  }
+	ngOnInit() {
+		let markedRender = new marked.Renderer2();
+		markedRender.image = function (href: string, title: string, text: string) {
+			let out = `<img style="max-width: 100%;" src="${ href }" alt="${ text }"`;
+			if (title) {
+				out += ` title="${ title }"`;
+			}
+			out += (<any>this.options).xhtml ? "/>" : ">";
+			console.log(out);
+			return out;
+		};
+		markedRender.code = function (code: any, language: any) {
+			let validLang = !!(language && hljs.getLanguage(language));
+			let highlighted = validLang ? hljs.highlight(language, code).value : code;
+			return `<pre style="padding: 0; border-radius: 0;"><code class="hljs ${ language }">${ highlighted }</code></pre>`;
+		};
+		markedRender.table = function (header: string, body: string) {
+			return `<table class="table table-bordered">\n<thead>\n${ header }</thead>\n<tbody>\n${ body }</tbody>\n</table>\n`;
+		};
+		markedRender.listitem = function (text: any, task: boolean, checked: boolean) {
+			if (/^\s*\[[x ]\]\s*/.test(text) || text.startsWith('<input')) {
+				if (text.startsWith('<input')) {
+					text = text
+						.replace('<input disabled="" type="checkbox">', '<i class="fa fa-square-o"></i>')
+						.replace('<input checked="" disabled="" type="checkbox">', '<i class="fa fa-check-square"></i>');
+				} else {
+					text = text
+						.replace(/^\s*\[ \]\s*/, '<i class="fa fa-square-o"></i> ')
+						.replace(/^\s*\[x\]\s*/, '<i class="fa fa-check-square"></i> ');
+				}
+				return `<li>${ text }</li>`;
+			} else {
+				return `<li>${ text }</li>`;
+			}
+		};
+		let markedjsOpt = {
+			renderer: markedRender,
+			highlight: (code: any) => hljs.highlightAuto(code).value
+		};
+		this._markedOpt = Object.assign({}, markedjsOpt, this.options.markedjsOpt);
+	}
 
-  validate(c: AbstractControl): ValidationErrors {
-    let result: any = null;
-    if (this.required && this.markdownValue.length === 0) {
-      result = { required: true };
-    }
-    if (this.maxlength > 0 && this.markdownValue.length > this.maxlength) {
-      result = { maxlength: true };
-    }
-    return result;
-  }
+	ngAfterViewInit() {
+		let editorElement = this.aceEditorContainer.nativeElement;
+		this._editor = ace.edit(editorElement);
+		this._editor.$blockScrolling = Infinity;
+		this._editor.getSession().setUseWrapMode(true);
+		this._editor.getSession().setMode("ace/mode/markdown");
+		this._editor.setValue(this.markdownValue || '', 1);
+		this._editor.setOption('scrollPastEnd', this._options.scrollPastEnd || 0);
 
-  insertContent(type: string, customContent?: string) {
-    if (!this._editor) return;
-    let selectedText = this._editor.getSelectedText();
-    let isSelected = !!selectedText;
-    let startSize = 2;
-    let initText: string = '';
-    let range = this._editor.selection.getRange();
-    switch (type) {
-      case 'Bold':
-        initText = 'Bold Text';
-        selectedText = `**${selectedText || initText}**`;
-        break;
-      case 'Italic':
-        initText = 'Italic Text';
-        selectedText = `*${selectedText || initText}*`;
-        startSize = 1;
-        break;
-      case 'Heading':
-        initText = 'Heading';
-        selectedText = `# ${selectedText || initText}`;
-        break;
-      case 'Refrence':
-        initText = 'Refrence';
-        selectedText = `> ${selectedText || initText}`;
-        break;
-      case 'Link':
-        selectedText = `[](http://)`;
-        startSize = 1;
-        break;
-      case 'Image':
-        selectedText = `![](http://)`;
-        break;
-      case 'Ul':
-        selectedText = `- ${selectedText || initText}`
-        break;
-      case 'Ol':
-        selectedText = `1. ${selectedText || initText}`
-        startSize = 3;
-        break;
-      case 'Code':
-        initText = 'Source Code';
-        selectedText = "```language\r\n" + (selectedText || initText) + "\r\n```";
-        startSize = 3;
-        break;
-      case 'Custom':
-        selectedText = customContent;
-        startSize = 0;
-        break;
-    }
-    this._editor.session.replace(range, selectedText);
-    if (!isSelected) {
-      range.start.column += startSize;
-      range.end.column = range.start.column + initText.length;
-      this._editor.selection.setRange(range);
-    }
-    this._editor.focus();
-  }
+		this._editor.on("change", (e: any) => {
+			let val = this._editor.getValue();
+			this.markdownValue = val;
+		});
+	}
 
-  togglePreview() {
-    this.showPreviewPanel = !this.showPreviewPanel;
-    this.editorResize();
-  }
+	ngOnDestroy() {
+		this._editor && this._editor.destroy();
+	}
 
-  previewPanelClick(event: Event) {
-    if (this.options.enablePreviewContentClick !== true) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-  }
+	writeValue(value: any | Array<any>): void {
+		setTimeout(() => {
+			this.markdownValue = value;
+			if (typeof value !== 'undefined' && this._editor) {
+				this._editor.setValue(value || '', 1);
+			}
+		}, 1);
+	}
 
-  fullScreen() {
-    this.isFullScreen = !this.isFullScreen;
-    this._renderer.setElementStyle(document.body, 'overflowY', this.isFullScreen ? 'hidden' : 'auto');
-    this.editorResize();
-  }
+	registerOnChange(fn: (_: any) => {}): void {
+		this._onChange = fn;
+	}
 
-  mdEditorResize(size: any) {
-    this.editorResize();
-  }
+	registerOnTouched(fn: () => {}): void {
+		this._onTouched = fn;
+	}
 
-  editorResize(timeOut: number = 100) {
-    if (!this._editor) return
-    if (this._editorResizeTimer) clearTimeout(this._editorResizeTimer);
-    this._editorResizeTimer = setTimeout(() => {
-      this._editor.resize();
-      this._editor.focus();
-    }, timeOut);
-  }
+	validate(c: AbstractControl): ValidationErrors {
+		let result: any = null;
+		if (this.required && this.markdownValue.length === 0) {
+			result = {required: true};
+		}
+		if (this.maxlength > 0 && this.markdownValue.length > this.maxlength) {
+			result = {maxlength: true};
+		}
+		return result;
+	}
 
-  onDragover(evt: DragEvent) {
-    evt.stopImmediatePropagation();
-    evt.preventDefault();
-    if (!this._hasUploadFunction) return;
-    this.dragover = true;
-  }
+	insertContent(type: string, customContent?: string) {
+		if (!this._editor) return;
+		let selectedText = this._editor.getSelectedText();
+		let isSelected = !!selectedText;
+		let startSize = 2;
+		let initText: string = '';
+		let range = this._editor.selection.getRange();
+		switch (type) {
+			case 'Bold':
+				initText = 'Bold Text';
+				selectedText = `**${ selectedText || initText }**`;
+				break;
+			case 'Italic':
+				initText = 'Italic Text';
+				selectedText = `*${ selectedText || initText }*`;
+				startSize = 1;
+				break;
+			case 'Heading':
+				initText = 'Heading';
+				selectedText = `# ${ selectedText || initText }`;
+				break;
+			case 'Refrence':
+				initText = 'Refrence';
+				selectedText = `> ${ selectedText || initText }`;
+				break;
+			case 'Link':
+				selectedText = `[](http://)`;
+				startSize = 1;
+				break;
+			case 'Image':
+				selectedText = `![](http://)`;
+				break;
+			case 'Ul':
+				selectedText = `- ${ selectedText || initText }`
+				break;
+			case 'Ol':
+				selectedText = `1. ${ selectedText || initText }`
+				startSize = 3;
+				break;
+			case 'Code':
+				initText = 'Source Code';
+				selectedText = "```language\r\n" + (selectedText || initText) + "\r\n```";
+				startSize = 3;
+				break;
+			case 'Custom':
+				selectedText = customContent;
+				startSize = 0;
+				break;
+		}
+		this._editor.session.replace(range, selectedText);
+		if (!isSelected) {
+			range.start.column += startSize;
+			range.end.column = range.start.column + initText.length;
+			this._editor.selection.setRange(range);
+		}
+		this._editor.focus();
+	}
 
-  onDrop(evt: DragEvent) {
-    evt.stopImmediatePropagation();
-    evt.preventDefault();
-    if (!this._hasUploadFunction || this.isUploading) return;
+	togglePreview() {
+		this.showPreviewPanel = !this.showPreviewPanel;
+		this.editorResize();
+	}
 
-    if (!evt.dataTransfer.files || evt.dataTransfer.files.length === 0) {
-      this.dragover = false;
-      return;
-    }
+	previewPanelClick(event: Event) {
+		if (this.options.enablePreviewContentClick !== true) {
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		}
+	}
 
-    this.isUploading = true;
-    Promise.resolve()
-      .then(() => {
-        return this.upload(evt.dataTransfer.files);
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          let msg = [];
-          for (let item of data) {
-            let tempMsg = `[${item.name}](${item.url})`;
-            if (item.isImg) {
-              tempMsg = `!${tempMsg}`;
-            }
-            msg.push(tempMsg);
-          }
-          this.insertContent('Custom', msg.join('\r\n'));
-        } else {
-          console.warn('Invalid upload result. Please using follow this type `UploadResult`.')
-        }
-        this.isUploading = false;
-        this.dragover = false;
-      })
-      .catch(err => {
-        console.error(err);
-        this.isUploading = false;
-        this.dragover = false;
-      });
-  }
+	fullScreen() {
+		this.isFullScreen = !this.isFullScreen;
+		this._renderer.setStyle(document.body, 'overflowY', this.isFullScreen ? 'hidden' : 'auto');
+		this.editorResize();
+	}
 
-  onDragleave(evt: DragEvent) {
-    evt.stopImmediatePropagation();
-    evt.preventDefault();
-    if (!this._hasUploadFunction) return;
-    this.dragover = false;
-  }
+	mdEditorResize(size: any) {
+		this.editorResize();
+	}
+
+	editorResize(timeOut: number = 100) {
+		if (!this._editor) return
+		if (this._editorResizeTimer) clearTimeout(this._editorResizeTimer);
+		this._editorResizeTimer = setTimeout(() => {
+			this._editor.resize();
+			this._editor.focus();
+		}, timeOut);
+	}
+
+	onDragover(evt: DragEvent) {
+		evt.stopImmediatePropagation();
+		evt.preventDefault();
+		if (!this._hasUploadFunction) return;
+		this.dragover = true;
+	}
+
+	onDrop(evt: DragEvent) {
+		evt.stopImmediatePropagation();
+		evt.preventDefault();
+		if (!this._hasUploadFunction || this.isUploading) return;
+
+		if (!evt.dataTransfer.files || evt.dataTransfer.files.length === 0) {
+			this.dragover = false;
+			return;
+		}
+
+		this.isUploading = true;
+		Promise.resolve()
+			.then(() => {
+				return this.upload(evt.dataTransfer.files);
+			})
+			.then(data => {
+				if (Array.isArray(data)) {
+					let msg = [];
+					for (let item of data) {
+						let tempMsg = `[${ item.name }](${ item.url })`;
+						if (item.isImg) {
+							tempMsg = `!${ tempMsg }`;
+						}
+						msg.push(tempMsg);
+					}
+					this.insertContent('Custom', msg.join('\r\n'));
+				} else {
+					console.warn('Invalid upload result. Please using follow this type `UploadResult`.')
+				}
+				this.isUploading = false;
+				this.dragover = false;
+			})
+			.catch(err => {
+				console.error(err);
+				this.isUploading = false;
+				this.dragover = false;
+			});
+	}
+
+	onDragleave(evt: DragEvent) {
+		evt.stopImmediatePropagation();
+		evt.preventDefault();
+		if (!this._hasUploadFunction) return;
+		this.dragover = false;
+	}
 }
